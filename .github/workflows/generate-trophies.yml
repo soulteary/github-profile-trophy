@@ -1,8 +1,8 @@
 name: Generate Trophy Examples
 
 on:
-  schedule:
-    - cron: "0 0 * * *" # Runs once daily at midnight
+  # schedule:
+    # - cron: "0 0 * * *" # Runs once daily at midnight
   workflow_dispatch:
   push:
     branches:

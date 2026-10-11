@@ -2,6 +2,7 @@ package fetchers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -70,7 +71,7 @@ query userInfo($username: String!) {
 const queryUserRepository = `
 query userInfo($username: String!, $after: String) {
   user(login: $username) {
-    repositories(first: 50, after: $after, ownerAffiliations: OWNER, orderBy: {direction: DESC, field: STARGAZERS}) {
+    repositories(first: 50, after: $after, ownerAffiliations: OWNER, orderBy: {direction: ASC, field: CREATED_AT}) {
       totalCount
       pageInfo {
         hasNextPage
@@ -94,7 +95,8 @@ query userInfo($username: String!, $after: String) {
 
 // GitHubClient handles GitHub API requests
 type GitHubClient struct {
-	client *http.Client
+	client       *http.Client
+	fetchTimeout time.Duration
 }
 
 // NewGitHubClient creates a new GitHub API client
@@ -107,7 +109,7 @@ func NewGitHubClient() *GitHubClient {
 }
 
 // executeQuery executes a GraphQL query
-func (c *GitHubClient) executeQuery(query string, variables map[string]interface{}, token string) (*http.Response, error) {
+func (c *GitHubClient) executeQuery(ctx context.Context, query string, variables map[string]interface{}, token string) (*http.Response, error) {
 	reqBody := GraphQLRequest{
 		Query:     query,
 		Variables: variables,
@@ -118,7 +120,7 @@ func (c *GitHubClient) executeQuery(query string, variables map[string]interface
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", githubAPIURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", githubAPIURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, err
 	}
@@ -136,16 +138,21 @@ func (c *GitHubClient) executeQuery(query string, variables map[string]interface
 
 // RequestUserActivity fetches user activity data
 func (c *GitHubClient) RequestUserActivity(username string) (GitHubUserActivity, error) {
+	return c.RequestUserActivityContext(context.Background(), username)
+}
+
+// RequestUserActivityContext fetches data within the caller's lifetime.
+func (c *GitHubClient) RequestUserActivityContext(ctx context.Context, username string) (GitHubUserActivity, error) {
 	variables := map[string]interface{}{
 		"username": username,
 	}
 
 	fetcher := func(vars interface{}, token string) (*http.Response, error) {
 		v := vars.(map[string]interface{})
-		return c.executeQuery(queryUserActivity, v, token)
+		return c.executeQuery(ctx, queryUserActivity, v, token)
 	}
 
-	resp, err := common.Retryer(fetcher, variables, 0, 0, time.Duration(common.DefaultGitHubRetryDelay)*time.Millisecond)
+	resp, err := common.RetryerContext(ctx, fetcher, variables, 0, 0, time.Duration(common.DefaultGitHubRetryDelay)*time.Millisecond)
 	if err != nil {
 		return GitHubUserActivity{}, err
 	}
@@ -186,16 +193,21 @@ func (c *GitHubClient) RequestUserActivity(username string) (GitHubUserActivity,
 
 // RequestUserIssue fetches user issue data
 func (c *GitHubClient) RequestUserIssue(username string) (GitHubUserIssue, error) {
+	return c.RequestUserIssueContext(context.Background(), username)
+}
+
+// RequestUserIssueContext fetches data within the caller's lifetime.
+func (c *GitHubClient) RequestUserIssueContext(ctx context.Context, username string) (GitHubUserIssue, error) {
 	variables := map[string]interface{}{
 		"username": username,
 	}
 
 	fetcher := func(vars interface{}, token string) (*http.Response, error) {
 		v := vars.(map[string]interface{})
-		return c.executeQuery(queryUserIssue, v, token)
+		return c.executeQuery(ctx, queryUserIssue, v, token)
 	}
 
-	resp, err := common.Retryer(fetcher, variables, 0, 0, time.Duration(common.DefaultGitHubRetryDelay)*time.Millisecond)
+	resp, err := common.RetryerContext(ctx, fetcher, variables, 0, 0, time.Duration(common.DefaultGitHubRetryDelay)*time.Millisecond)
 	if err != nil {
 		return GitHubUserIssue{}, err
 	}
@@ -236,16 +248,21 @@ func (c *GitHubClient) RequestUserIssue(username string) (GitHubUserIssue, error
 
 // RequestUserPullRequest fetches user pull request data
 func (c *GitHubClient) RequestUserPullRequest(username string) (GitHubUserPullRequest, error) {
+	return c.RequestUserPullRequestContext(context.Background(), username)
+}
+
+// RequestUserPullRequestContext fetches data within the caller's lifetime.
+func (c *GitHubClient) RequestUserPullRequestContext(ctx context.Context, username string) (GitHubUserPullRequest, error) {
 	variables := map[string]interface{}{
 		"username": username,
 	}
 
 	fetcher := func(vars interface{}, token string) (*http.Response, error) {
 		v := vars.(map[string]interface{})
-		return c.executeQuery(queryUserPullRequest, v, token)
+		return c.executeQuery(ctx, queryUserPullRequest, v, token)
 	}
 
-	resp, err := common.Retryer(fetcher, variables, 0, 0, time.Duration(common.DefaultGitHubRetryDelay)*time.Millisecond)
+	resp, err := common.RetryerContext(ctx, fetcher, variables, 0, 0, time.Duration(common.DefaultGitHubRetryDelay)*time.Millisecond)
 	if err != nil {
 		return GitHubUserPullRequest{}, err
 	}
@@ -286,11 +303,26 @@ func (c *GitHubClient) RequestUserPullRequest(username string) (GitHubUserPullRe
 
 // RequestUserRepository fetches user repository data
 func (c *GitHubClient) RequestUserRepository(username string) (GitHubUserRepository, error) {
+	return c.RequestUserRepositoryContext(context.Background(), username)
+}
+
+// RequestUserRepositoryContext fetches data within the caller's lifetime.
+func (c *GitHubClient) RequestUserRepositoryContext(ctx context.Context, username string) (GitHubUserRepository, error) {
+	timeout := c.fetchTimeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	var result GitHubUserRepository
 	var after *string
 	seenCursors := make(map[string]bool)
 	for {
-		page, err := c.requestUserRepositoryPage(username, after)
+		if err := ctx.Err(); err != nil {
+			return GitHubUserRepository{}, err
+		}
+		page, err := c.requestUserRepositoryPage(ctx, username, after)
 		if err != nil {
 			return GitHubUserRepository{}, err
 		}
@@ -310,7 +342,7 @@ func (c *GitHubClient) RequestUserRepository(username string) (GitHubUserReposit
 }
 
 // requestUserRepositoryPage fetches and validates one page, closing its response body.
-func (c *GitHubClient) requestUserRepositoryPage(username string, after *string) (GitHubUserRepository, error) {
+func (c *GitHubClient) requestUserRepositoryPage(ctx context.Context, username string, after *string) (GitHubUserRepository, error) {
 	variables := map[string]interface{}{
 		"username": username,
 		"after":    after,
@@ -318,10 +350,10 @@ func (c *GitHubClient) requestUserRepositoryPage(username string, after *string)
 
 	fetcher := func(vars interface{}, token string) (*http.Response, error) {
 		v := vars.(map[string]interface{})
-		return c.executeQuery(queryUserRepository, v, token)
+		return c.executeQuery(ctx, queryUserRepository, v, token)
 	}
 
-	resp, err := common.Retryer(fetcher, variables, 0, 0, time.Duration(common.DefaultGitHubRetryDelay)*time.Millisecond)
+	resp, err := common.RetryerContext(ctx, fetcher, variables, 0, 0, time.Duration(common.DefaultGitHubRetryDelay)*time.Millisecond)
 	if err != nil {
 		return GitHubUserRepository{}, err
 	}
@@ -362,6 +394,18 @@ func (c *GitHubClient) requestUserRepositoryPage(username string, after *string)
 
 // RequestUserInfo fetches all user information
 func (c *GitHubClient) RequestUserInfo(username string) (UserInfo, error) {
+	return c.RequestUserInfoContext(context.Background(), username)
+}
+
+// RequestUserInfoContext fetches data within the caller's lifetime.
+func (c *GitHubClient) RequestUserInfoContext(ctx context.Context, username string) (UserInfo, error) {
+	timeout := c.fetchTimeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	type result struct {
 		activity    *GitHubUserActivity
 		issue       *GitHubUserIssue
@@ -374,7 +418,7 @@ func (c *GitHubClient) RequestUserInfo(username string) (UserInfo, error) {
 	results := make(chan result, 4)
 
 	go func() {
-		activity, err := c.RequestUserActivity(username)
+		activity, err := c.RequestUserActivityContext(ctx, username)
 		if err != nil {
 			results <- result{err: err, which: "activity"}
 			return
@@ -383,7 +427,7 @@ func (c *GitHubClient) RequestUserInfo(username string) (UserInfo, error) {
 	}()
 
 	go func() {
-		issue, err := c.RequestUserIssue(username)
+		issue, err := c.RequestUserIssueContext(ctx, username)
 		if err != nil {
 			results <- result{err: err, which: "issue"}
 			return
@@ -392,7 +436,7 @@ func (c *GitHubClient) RequestUserInfo(username string) (UserInfo, error) {
 	}()
 
 	go func() {
-		pullRequest, err := c.RequestUserPullRequest(username)
+		pullRequest, err := c.RequestUserPullRequestContext(ctx, username)
 		if err != nil {
 			results <- result{err: err, which: "pullRequest"}
 			return
@@ -401,7 +445,7 @@ func (c *GitHubClient) RequestUserInfo(username string) (UserInfo, error) {
 	}()
 
 	go func() {
-		repository, err := c.RequestUserRepository(username)
+		repository, err := c.RequestUserRepositoryContext(ctx, username)
 		if err != nil {
 			results <- result{err: err, which: "repository"}
 			return
@@ -415,10 +459,14 @@ func (c *GitHubClient) RequestUserInfo(username string) (UserInfo, error) {
 	var repository GitHubUserRepository
 	var hasActivity bool
 	var firstErr error
+	var repositoryErr error
 
 	for i := 0; i < 4; i++ {
 		res := <-results
 		if res.err != nil {
+			if res.which == "repository" {
+				repositoryErr = res.err
+			}
 			if firstErr == nil {
 				firstErr = res.err
 			}
@@ -443,6 +491,13 @@ func (c *GitHubClient) RequestUserInfo(username string) (UserInfo, error) {
 				repository = *res.repository
 			}
 		}
+	}
+
+	if err := ctx.Err(); err != nil {
+		return UserInfo{}, err
+	}
+	if repositoryErr != nil {
+		return UserInfo{}, repositoryErr
 	}
 
 	// If we got an error and no essential data (activity is required), return the error

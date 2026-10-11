@@ -62,7 +62,7 @@ func TrophyHandler(c *gin.Context) {
 	if userInfo == nil {
 		// Fetch from GitHub API
 		client := fetchers.NewGitHubClient()
-		info, err := client.RequestUserInfo(username)
+		info, err := client.RequestUserInfoContext(c.Request.Context(), username)
 		if err != nil {
 			log.Printf("Error fetching user info for %s: %v", username, err)
 			if customErr, ok := err.(*common.CustomError); ok {

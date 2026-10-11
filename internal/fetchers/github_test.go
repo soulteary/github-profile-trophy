@@ -1,11 +1,15 @@
 package fetchers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 type repositoryTransport func(*http.Request) (*http.Response, error)
@@ -34,6 +38,9 @@ func repositoryClient(t *testing.T, responses []string, cursors []interface{}) *
 		}
 		if !strings.Contains(req.Query, "after: $after") || !strings.Contains(req.Query, "hasNextPage") {
 			t.Fatal("query does not request cursor pagination")
+		}
+		if !strings.Contains(req.Query, "direction: ASC, field: CREATED_AT") || strings.Contains(req.Query, "field: STARGAZERS") {
+			t.Fatal("repositories must use immutable creation ordering")
 		}
 		body := responses[calls]
 		calls++
@@ -81,5 +88,71 @@ func TestRequestUserRepositoryRejectsIncompleteResults(t *testing.T) {
 				t.Fatalf("expected error without partial results, got %+v, %v", repos, err)
 			}
 		})
+	}
+}
+
+func TestRepositoryPaginationHasOneOverallDeadline(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN1", "test-token")
+	calls := 0
+	var deadline time.Time
+	client := &GitHubClient{fetchTimeout: 25 * time.Millisecond, client: &http.Client{Transport: repositoryTransport(func(r *http.Request) (*http.Response, error) {
+		got, ok := r.Context().Deadline()
+		if !ok {
+			t.Error("missing overall deadline")
+		}
+		if calls == 0 {
+			deadline = got
+		} else if !got.Equal(deadline) {
+			t.Error("deadline restarted for next page")
+		}
+		calls++
+		timer := time.NewTimer(10 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-r.Context().Done():
+			return nil, r.Context().Err()
+		case <-timer.C:
+		}
+		body := fmt.Sprintf(`{"data":{"user":{"repositories":{"pageInfo":{"hasNextPage":true,"endCursor":"page%d"},"nodes":[{}]}}}}`, calls)
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}}
+	repos, err := client.RequestUserRepositoryContext(context.Background(), "example")
+	if !errors.Is(err, context.DeadlineExceeded) || len(repos.Repositories.Nodes) != 0 {
+		t.Fatalf("expected deadline without partial totals, got %+v, %v", repos, err)
+	}
+}
+
+func TestUserInfoPropagatesCallerCancellation(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN1", "test-token")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started := make(chan struct{}, 4)
+	stopped := make(chan struct{}, 4)
+	client := &GitHubClient{client: &http.Client{Transport: repositoryTransport(func(r *http.Request) (*http.Response, error) {
+		started <- struct{}{}
+		<-r.Context().Done()
+		stopped <- struct{}{}
+		return nil, r.Context().Err()
+	})}}
+	result := make(chan error, 1)
+	go func() { _, err := client.RequestUserInfoContext(ctx, "example"); result <- err }()
+	for i := 0; i < 4; i++ {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatal("fetch did not start")
+		}
+	}
+	cancel()
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected cancellation, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("caller cancellation did not stop the fetch")
+	}
+	if len(stopped) != 4 {
+		t.Fatalf("only %d of 4 requests stopped", len(stopped))
 	}
 }

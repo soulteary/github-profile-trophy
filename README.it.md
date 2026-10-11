@@ -57,14 +57,13 @@ Se stai già usando il GitHub Profile Trophy originale, sostituisci semplicement
 
 Naturalmente, **consigliamo** di usare invece l'approccio GitHub Actions. Basta aggiornare i parametri della richiesta originale nel file Action:
 
-```yml
-...
+```yaml
 - name: Generate trophy card
-  uses: soulteary/github-profile-trophy-action@v1.0.0
-    with:
-      options: 'username=${{ github.repository_owner }}&theme=onedark)](https://github.com/ryo-ma/github-profile-trophy'
-      path: .github/assets/trophy.svg
-      token: ${{ secrets.GITHUB_TOKEN }}
+  uses: soulteary/github-profile-trophy-action@v1
+  with:
+    options: 'username=${{ github.repository_owner }}&theme=onedark'
+    path: .github/assets/trophy.svg
+    token: ${{ secrets.PROFILE_STATS_TOKEN }}
 ```
 
 ## Funzionalità
@@ -128,6 +127,8 @@ Tutti gli esempi seguenti usano gli stessi parametri URL del progetto originale.
 
 Puoi usare [github-profile-trophy-action](https://github.com/soulteary/github-profile-trophy-action) per generare carte trofei nella tua pipeline CI/CD:
 
+Salva un PAT dedicato alle statistiche del profilo nel secret del repository `PROFILE_STATS_TOKEN`. Consulta la [configurazione del token](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.it.md). Checkout e push continuano a usare `GITHUB_TOKEN`.
+
 ```yaml
 name: Generate Trophy
 
@@ -148,11 +149,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate trophy card
-        uses: soulteary/github-profile-trophy-action@v1.0.0
+        uses: soulteary/github-profile-trophy-action@v1
         with:
           options: 'username=${{ github.repository_owner }}&theme=gruvbox&column=7&margin-w=15&margin-h=15'
           path: .github/assets/trophy.svg
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PROFILE_STATS_TOKEN }}
 
       - name: Commit trophy card
         run: |

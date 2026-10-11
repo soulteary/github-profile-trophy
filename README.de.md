@@ -59,6 +59,8 @@ Natürlich **empfehlen wir**, stattdessen den GitHub Actions-Ansatz zu verwenden
 
 Erstelle vor der Verwendung dieses Beispiels ein Repository-Secret namens `PROFILE_STATS_TOKEN` mit einem eigenen PAT. Befolge die [Token-Konfiguration](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.de.md). Ein nicht gesetztes Secret ergibt einen leeren Wert; die Action verwendet dann den auf das Repository beschränkten `GITHUB_TOKEN`.
 
+Verwende für öffentliche Statistiken ein personal access token (classic) mit `public_repo` und `read:user`. Ersetze für private Repositorys `public_repo` durch `repo` (dies erlaubt auch Schreibzugriff auf Repositorys). Lege ein Ablaufdatum fest und speichere den Token im Workflow-Repository unter **Settings → Secrets and variables → Actions → New repository secret**.
+
 ```yaml
 - name: Generate trophy card
   uses: soulteary/github-profile-trophy-action@v1

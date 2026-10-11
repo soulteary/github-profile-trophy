@@ -59,6 +59,8 @@
 
 이 예제를 사용하기 전에 전용 PAT를 담은 저장소 시크릿 `PROFILE_STATS_TOKEN`을 생성하세요. [토큰 설정 안내](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.kr.md)를 참고하세요. 설정되지 않은 시크릿은 빈 값으로 처리되므로 Action은 워크플로 저장소로 범위가 제한된 `GITHUB_TOKEN`을 사용합니다.
 
+공개 통계에는 `public_repo`와 `read:user` 권한을 가진 personal access token (classic)을 사용하세요. 비공개 저장소도 포함하려면 `public_repo`를 `repo`로 바꾸세요(저장소 쓰기 권한도 부여됩니다). 만료일을 설정하고 워크플로를 실행하는 저장소의 **Settings → Secrets and variables → Actions → New repository secret**에서 토큰을 저장하세요.
+
 ```yaml
 - name: Generate trophy card
   uses: soulteary/github-profile-trophy-action@v1

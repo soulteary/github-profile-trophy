@@ -376,10 +376,9 @@ func (c *GitHubClient) requestUserRepositoryPage(ctx context.Context, username s
 	}
 
 	if len(graphqlResp.Errors) > 0 {
-		return GitHubUserRepository{}, common.NewCustomError(
-			graphqlResp.Errors[0].Message,
-			common.ErrorTypeNotFound,
-		)
+		// RetryerContext already identifies unresolved users and rate limits.
+		// Other GraphQL errors are upstream failures, even when data.user is null.
+		return GitHubUserRepository{}, fmt.Errorf("GitHub repository query failed: %s", graphqlResp.Errors[0].Message)
 	}
 
 	if graphqlResp.Data.User == nil {

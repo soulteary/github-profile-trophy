@@ -99,8 +99,7 @@ func RetryerContext(ctx context.Context, fetcher FetcherFunction, variables inte
 			errorType := graphqlResp.Errors[0].Type
 			errorMsg := graphqlResp.Errors[0].Message
 			isRateLimited := errorType == "RATE_LIMITED" || regexp.MustCompile(`(?i)rate limit`).MatchString(errorMsg)
-			isNotFound := strings.Contains(strings.ToLower(errorMsg), "could not resolve to a user") ||
-				strings.Contains(strings.ToLower(errorMsg), "not found")
+			isNotFound := strings.Contains(strings.ToLower(errorMsg), "could not resolve to a user")
 
 			if isNotFound {
 				// User not found, don't retry

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/soulteary/github-profile-trophy/internal/common"
 )
 
 type repositoryTransport func(*http.Request) (*http.Response, error)
@@ -154,5 +156,55 @@ func TestUserInfoPropagatesCallerCancellation(t *testing.T) {
 	}
 	if len(stopped) != 4 {
 		t.Fatalf("only %d of 4 requests stopped", len(stopped))
+	}
+}
+
+func TestRepositoryGraphQLErrorClassification(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		response string
+		notFound bool
+	}{
+		{"resolver failure", `{"data":{"user":null},"errors":[{"type":"INTERNAL","message":"resolver failed"}]}`, false},
+		{"partial data", `{"data":{"user":{"repositories":{"nodes":[{}]}}},"errors":[{"message":"resolver failed"}]}`, false},
+		{"unrelated not found", `{"errors":[{"type":"NOT_FOUND","message":"Repository not found"}]}`, false},
+		{"unresolved user", `{"data":{"user":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a User with the login of 'example'."}]}`, true},
+		{"missing user", `{"data":{"user":null}}`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := repositoryClient(t, []string{tc.response}, []interface{}{nil})
+			repos, err := client.RequestUserRepository("example")
+			if err == nil || len(repos.Repositories.Nodes) != 0 {
+				t.Fatalf("expected error without partial results, got %+v, %v", repos, err)
+			}
+			var customErr *common.CustomError
+			notFound := errors.As(err, &customErr) && customErr.Type == common.ErrorTypeNotFound
+			if notFound != tc.notFound {
+				t.Fatalf("notFound = %v, want %v: %v", notFound, tc.notFound, err)
+			}
+		})
+	}
+}
+
+func TestUserInfoPreservesRepositoryServiceFailure(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN1", "test-token")
+	client := &GitHubClient{client: &http.Client{Transport: repositoryTransport(func(r *http.Request) (*http.Response, error) {
+		var req GraphQLRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			return nil, err
+		}
+		body := `{"data":{"user":{}}}`
+		if strings.Contains(req.Query, "repositories(") {
+			body = `{"data":{"user":null},"errors":[{"type":"INTERNAL","message":"resolver failed"}]}`
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}}
+	_, err := client.RequestUserInfo("example")
+	if err == nil || !strings.Contains(err.Error(), "resolver failed") {
+		t.Fatalf("expected repository service failure, got %v", err)
+	}
+	var customErr *common.CustomError
+	if errors.As(err, &customErr) && customErr.Type == common.ErrorTypeNotFound {
+		t.Fatalf("service failure misclassified as missing user: %v", err)
 	}
 }

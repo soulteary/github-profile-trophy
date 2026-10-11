@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,6 +46,14 @@ func GetPAT(index int) string {
 
 // Retryer tries to execute the fetcher function until it succeeds or max retries is reached
 func Retryer(fetcher FetcherFunction, variables interface{}, retries int, maxRetries int, delay time.Duration) (*http.Response, error) {
+	return RetryerContext(context.Background(), fetcher, variables, retries, maxRetries, delay)
+}
+
+// RetryerContext stops requests and retry delays when the caller cancels.
+func RetryerContext(ctx context.Context, fetcher FetcherFunction, variables interface{}, retries int, maxRetries int, delay time.Duration) (*http.Response, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if maxRetries == 0 {
 		maxRetries = GetPATCount()
 	}
@@ -68,8 +77,10 @@ func Retryer(fetcher FetcherFunction, variables interface{}, retries int, maxRet
 	if err != nil {
 		// Network/unexpected error → retry with delay
 		if retries < maxRetries-1 {
-			time.Sleep(delay)
-			return Retryer(fetcher, variables, retries+1, maxRetries, delay)
+			if err := waitForRetry(ctx, delay); err != nil {
+				return nil, err
+			}
+			return RetryerContext(ctx, fetcher, variables, retries+1, maxRetries, delay)
 		}
 		return nil, err
 	}
@@ -88,8 +99,7 @@ func Retryer(fetcher FetcherFunction, variables interface{}, retries int, maxRet
 			errorType := graphqlResp.Errors[0].Type
 			errorMsg := graphqlResp.Errors[0].Message
 			isRateLimited := errorType == "RATE_LIMITED" || regexp.MustCompile(`(?i)rate limit`).MatchString(errorMsg)
-			isNotFound := strings.Contains(strings.ToLower(errorMsg), "could not resolve to a user") ||
-				strings.Contains(strings.ToLower(errorMsg), "not found")
+			isNotFound := strings.Contains(strings.ToLower(errorMsg), "could not resolve to a user")
 
 			if isNotFound {
 				// User not found, don't retry
@@ -98,8 +108,10 @@ func Retryer(fetcher FetcherFunction, variables interface{}, retries int, maxRet
 
 			if isRateLimited {
 				// Retry with next token
-				time.Sleep(delay)
-				return Retryer(fetcher, variables, retries+1, maxRetries, delay)
+				if err := waitForRetry(ctx, delay); err != nil {
+					return nil, err
+				}
+				return RetryerContext(ctx, fetcher, variables, retries+1, maxRetries, delay)
 			}
 		}
 	}
@@ -112,8 +124,10 @@ func Retryer(fetcher FetcherFunction, variables interface{}, retries int, maxRet
 
 		if isBadCredential || isAccountSuspended {
 			// Retry with next token
-			time.Sleep(delay)
-			return Retryer(fetcher, variables, retries+1, maxRetries, delay)
+			if err := waitForRetry(ctx, delay); err != nil {
+				return nil, err
+			}
+			return RetryerContext(ctx, fetcher, variables, retries+1, maxRetries, delay)
 		}
 	}
 
@@ -125,4 +139,15 @@ func Retryer(fetcher FetcherFunction, variables interface{}, retries int, maxRet
 	// Create a new response reader for the body
 	response.Body = io.NopCloser(strings.NewReader(string(body)))
 	return response, nil
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

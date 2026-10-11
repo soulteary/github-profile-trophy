@@ -57,14 +57,17 @@
 
 もちろん、**推奨**は GitHub Actions のアプローチを使用することです。Action ファイルで元のリクエストパラメータを更新するだけです：
 
-```yml
-...
+この例を使用する前に、専用 PAT を保存するリポジトリシークレット `PROFILE_STATS_TOKEN` を作成してください。手順は[トークン設定](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.ja.md)を参照してください。未設定のシークレットは空の値となり、Action はワークフローのリポジトリに限定された `GITHUB_TOKEN` を使用します。
+
+`public_repo` もトークン所有者がアクセスできる公開リポジトリへの読み書き権限を付与するため、このトークンは読み取り専用ではありません。公開統計には `public_repo` と `read:user` を付与した personal access token (classic) を使用してください。非公開リポジトリも対象にする場合は `public_repo` を `repo` に変更します（リポジトリへの書き込み権限も付与されます）。有効期限を設定し、ワークフローを実行するリポジトリの **Settings → Secrets and variables → Actions → New repository secret** でトークンを保存してください。
+
+```yaml
 - name: Generate trophy card
-  uses: soulteary/github-profile-trophy-action@v1.0.0
-    with:
-      options: 'username=${{ github.repository_owner }}&theme=onedark)](https://github.com/ryo-ma/github-profile-trophy'
-      path: .github/assets/trophy.svg
-      token: ${{ secrets.GITHUB_TOKEN }}
+  uses: soulteary/github-profile-trophy-action@v1
+  with:
+    options: 'username=${{ github.repository_owner }}&theme=onedark'
+    path: .github/assets/trophy.svg
+    token: ${{ secrets.PROFILE_STATS_TOKEN }}
 ```
 
 ## 機能
@@ -128,6 +131,8 @@
 
 [github-profile-trophy-action](https://github.com/soulteary/github-profile-trophy-action)を使用して、CI/CDパイプラインでトロフィーカードを生成できます：
 
+プロフィール統計用の専用 PAT をリポジトリのシークレット `PROFILE_STATS_TOKEN` に保存してください。[トークン設定](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.ja.md)を参照してください。チェックアウトとプッシュには引き続き `GITHUB_TOKEN` を使用します。
+
 ```yaml
 name: Generate Trophy
 
@@ -148,11 +153,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate trophy card
-        uses: soulteary/github-profile-trophy-action@v1.0.0
+        uses: soulteary/github-profile-trophy-action@v1
         with:
           options: 'username=${{ github.repository_owner }}&theme=gruvbox&column=7&margin-w=15&margin-h=15'
           path: .github/assets/trophy.svg
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PROFILE_STATS_TOKEN }}
 
       - name: Commit trophy card
         run: |

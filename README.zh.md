@@ -57,14 +57,17 @@
 
 当然，**更推荐**你参考“在 GitHub Actions 中使用”的方式，将原始请求参数更新到 Action 文件中即可：
 
-```yml
-...
+使用此示例前，请先创建名为 `PROFILE_STATS_TOKEN` 的仓库 Secret，保存专用 PAT，具体步骤参见 Action 的[令牌配置说明](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.zh.md#令牌配置)。未设置的 Secret 会解析为空值，导致 Action 回退到仅限当前仓库的 `GITHUB_TOKEN`。
+
+`public_repo` 也允许读写令牌所有者可访问的公开仓库；该令牌并非只读。公开统计可使用 personal access token (classic)，勾选 `public_repo` 和 `read:user`。如需统计私有仓库，将 `public_repo` 替换为 `repo`（该权限也允许写入仓库）。请设置有效期，并在运行工作流的仓库中通过 **Settings → Secrets and variables → Actions → New repository secret** 保存令牌。
+
+```yaml
 - name: Generate trophy card
-  uses: soulteary/github-profile-trophy-action@v1.0.0
-    with:
-      options: 'username=${{ github.repository_owner }}&theme=onedark)](https://github.com/ryo-ma/github-profile-trophy'
-      path: .github/assets/trophy.svg
-      token: ${{ secrets.GITHUB_TOKEN }}
+  uses: soulteary/github-profile-trophy-action@v1
+  with:
+    options: 'username=${{ github.repository_owner }}&theme=onedark'
+    path: .github/assets/trophy.svg
+    token: ${{ secrets.PROFILE_STATS_TOKEN }}
 ```
 
 ## 功能特性
@@ -128,6 +131,8 @@
 
 你可以使用 [github-profile-trophy-action](https://github.com/soulteary/github-profile-trophy-action) 在 CI/CD 流水线中生成奖杯卡片：
 
+创建名为 `PROFILE_STATS_TOKEN` 的仓库 Secret，保存用于个人统计的专用 PAT。参见 Action 的[令牌配置与排查说明](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.zh.md#令牌配置)。检出和推送继续使用自动生成的 `GITHUB_TOKEN`；`contents: write` 不会赋予它跨仓库访问权限。
+
 ```yaml
 name: Generate Trophy
 
@@ -148,11 +153,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate trophy card
-        uses: soulteary/github-profile-trophy-action@v1.0.0
+        uses: soulteary/github-profile-trophy-action@v1
         with:
           options: 'username=${{ github.repository_owner }}&theme=gruvbox&column=7&margin-w=15&margin-h=15'
           path: .github/assets/trophy.svg
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PROFILE_STATS_TOKEN }}
 
       - name: Commit trophy card
         run: |

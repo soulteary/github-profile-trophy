@@ -57,6 +57,8 @@ If you're already using the original GitHub Profile Trophy, simply replace the b
 
 Of course, **we recommend** using the GitHub Actions approach instead. Simply update the original request parameters in the Action file:
 
+Before using this example, create a repository secret named `PROFILE_STATS_TOKEN` containing a dedicated PAT. Follow the action’s [token setup instructions](https://github.com/soulteary/github-profile-trophy-action#token-setup). An unset secret resolves to an empty value, causing the action to fall back to the repository-scoped `GITHUB_TOKEN`.
+
 ```yaml
 - name: Generate trophy card
   uses: soulteary/github-profile-trophy-action@v1

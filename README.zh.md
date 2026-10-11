@@ -57,6 +57,8 @@
 
 当然，**更推荐**你参考“在 GitHub Actions 中使用”的方式，将原始请求参数更新到 Action 文件中即可：
 
+使用此示例前，请先创建名为 `PROFILE_STATS_TOKEN` 的仓库 Secret，保存专用 PAT，具体步骤参见 Action 的[令牌配置说明](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.zh.md#令牌配置)。未设置的 Secret 会解析为空值，导致 Action 回退到仅限当前仓库的 `GITHUB_TOKEN`。
+
 ```yaml
 - name: Generate trophy card
   uses: soulteary/github-profile-trophy-action@v1

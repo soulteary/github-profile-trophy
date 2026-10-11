@@ -57,6 +57,8 @@
 
 물론, **권장**하는 방법은 GitHub Actions 방식을 사용하는 것입니다. Action 파일에서 원본 요청 매개변수만 업데이트하면 됩니다:
 
+이 예제를 사용하기 전에 전용 PAT를 담은 저장소 시크릿 `PROFILE_STATS_TOKEN`을 생성하세요. [토큰 설정 안내](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.kr.md)를 참고하세요. 설정되지 않은 시크릿은 빈 값으로 처리되므로 Action은 워크플로 저장소로 범위가 제한된 `GITHUB_TOKEN`을 사용합니다.
+
 ```yaml
 - name: Generate trophy card
   uses: soulteary/github-profile-trophy-action@v1

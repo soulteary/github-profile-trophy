@@ -57,6 +57,8 @@
 
 もちろん、**推奨**は GitHub Actions のアプローチを使用することです。Action ファイルで元のリクエストパラメータを更新するだけです：
 
+この例を使用する前に、専用 PAT を保存するリポジトリシークレット `PROFILE_STATS_TOKEN` を作成してください。手順は[トークン設定](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.ja.md)を参照してください。未設定のシークレットは空の値となり、Action はワークフローのリポジトリに限定された `GITHUB_TOKEN` を使用します。
+
 ```yaml
 - name: Generate trophy card
   uses: soulteary/github-profile-trophy-action@v1

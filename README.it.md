@@ -57,6 +57,8 @@ Se stai già usando il GitHub Profile Trophy originale, sostituisci semplicement
 
 Naturalmente, **consigliamo** di usare invece l'approccio GitHub Actions. Basta aggiornare i parametri della richiesta originale nel file Action:
 
+Prima di usare questo esempio, crea un secret del repository chiamato `PROFILE_STATS_TOKEN` contenente un PAT dedicato. Segui le [istruzioni di configurazione del token](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.it.md). Un secret non impostato restituisce un valore vuoto e l’azione usa quindi `GITHUB_TOKEN`, limitato al repository del workflow.
+
 ```yaml
 - name: Generate trophy card
   uses: soulteary/github-profile-trophy-action@v1

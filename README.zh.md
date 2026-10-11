@@ -59,7 +59,7 @@
 
 使用此示例前，请先创建名为 `PROFILE_STATS_TOKEN` 的仓库 Secret，保存专用 PAT，具体步骤参见 Action 的[令牌配置说明](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.zh.md#令牌配置)。未设置的 Secret 会解析为空值，导致 Action 回退到仅限当前仓库的 `GITHUB_TOKEN`。
 
-公开统计可使用 personal access token (classic)，勾选 `public_repo` 和 `read:user`。如需统计私有仓库，将 `public_repo` 替换为 `repo`（该权限也允许写入仓库）。请设置有效期，并在运行工作流的仓库中通过 **Settings → Secrets and variables → Actions → New repository secret** 保存令牌。
+`public_repo` 也允许读写令牌所有者可访问的公开仓库；该令牌并非只读。公开统计可使用 personal access token (classic)，勾选 `public_repo` 和 `read:user`。如需统计私有仓库，将 `public_repo` 替换为 `repo`（该权限也允许写入仓库）。请设置有效期，并在运行工作流的仓库中通过 **Settings → Secrets and variables → Actions → New repository secret** 保存令牌。
 
 ```yaml
 - name: Generate trophy card

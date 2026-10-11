@@ -59,7 +59,7 @@
 
 この例を使用する前に、専用 PAT を保存するリポジトリシークレット `PROFILE_STATS_TOKEN` を作成してください。手順は[トークン設定](https://github.com/soulteary/github-profile-trophy-action/blob/main/README.ja.md)を参照してください。未設定のシークレットは空の値となり、Action はワークフローのリポジトリに限定された `GITHUB_TOKEN` を使用します。
 
-公開統計には `public_repo` と `read:user` を付与した personal access token (classic) を使用してください。非公開リポジトリも対象にする場合は `public_repo` を `repo` に変更します（リポジトリへの書き込み権限も付与されます）。有効期限を設定し、ワークフローを実行するリポジトリの **Settings → Secrets and variables → Actions → New repository secret** でトークンを保存してください。
+`public_repo` もトークン所有者がアクセスできる公開リポジトリへの読み書き権限を付与するため、このトークンは読み取り専用ではありません。公開統計には `public_repo` と `read:user` を付与した personal access token (classic) を使用してください。非公開リポジトリも対象にする場合は `public_repo` を `repo` に変更します（リポジトリへの書き込み権限も付与されます）。有効期限を設定し、ワークフローを実行するリポジトリの **Settings → Secrets and variables → Actions → New repository secret** でトークンを保存してください。
 
 ```yaml
 - name: Generate trophy card

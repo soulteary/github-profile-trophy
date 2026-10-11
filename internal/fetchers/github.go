@@ -68,10 +68,14 @@ query userInfo($username: String!) {
 
 // queryUserRepository is the GraphQL query for user repositories
 const queryUserRepository = `
-query userInfo($username: String!) {
+query userInfo($username: String!, $after: String) {
   user(login: $username) {
-    repositories(first: 50, ownerAffiliations: OWNER, orderBy: {direction: DESC, field: STARGAZERS}) {
+    repositories(first: 50, after: $after, ownerAffiliations: OWNER, orderBy: {direction: DESC, field: STARGAZERS}) {
       totalCount
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
       nodes {
         languages(first: 3, orderBy: {direction:DESC, field: SIZE}) {
           nodes {
@@ -282,8 +286,34 @@ func (c *GitHubClient) RequestUserPullRequest(username string) (GitHubUserPullRe
 
 // RequestUserRepository fetches user repository data
 func (c *GitHubClient) RequestUserRepository(username string) (GitHubUserRepository, error) {
+	var result GitHubUserRepository
+	var after *string
+	seenCursors := make(map[string]bool)
+	for {
+		page, err := c.requestUserRepositoryPage(username, after)
+		if err != nil {
+			return GitHubUserRepository{}, err
+		}
+		result.Repositories.TotalCount = page.Repositories.TotalCount
+		result.Repositories.Nodes = append(result.Repositories.Nodes, page.Repositories.Nodes...)
+		result.Repositories.PageInfo = page.Repositories.PageInfo
+		if !page.Repositories.PageInfo.HasNextPage {
+			return result, nil
+		}
+		cursor := page.Repositories.PageInfo.EndCursor
+		if cursor == "" || seenCursors[cursor] {
+			return GitHubUserRepository{}, fmt.Errorf("repository pagination returned an empty or repeated cursor")
+		}
+		seenCursors[cursor] = true
+		after = &cursor
+	}
+}
+
+// requestUserRepositoryPage fetches and validates one page, closing its response body.
+func (c *GitHubClient) requestUserRepositoryPage(username string, after *string) (GitHubUserRepository, error) {
 	variables := map[string]interface{}{
 		"username": username,
+		"after":    after,
 	}
 
 	fetcher := func(vars interface{}, token string) (*http.Response, error) {
@@ -295,9 +325,9 @@ func (c *GitHubClient) RequestUserRepository(username string) (GitHubUserReposit
 	if err != nil {
 		return GitHubUserRepository{}, err
 	}
-	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
 	if err != nil {
 		return GitHubUserRepository{}, err
 	}

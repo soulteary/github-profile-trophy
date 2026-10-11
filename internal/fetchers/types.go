@@ -24,6 +24,10 @@ type Repository struct {
 // GitHubUserRepository represents repository data from GitHub API
 type GitHubUserRepository struct {
 	Repositories struct {
+		PageInfo struct {
+			HasNextPage bool   `json:"hasNextPage"`
+			EndCursor   string `json:"endCursor"`
+		} `json:"pageInfo"`
 		TotalCount int          `json:"totalCount"`
 		Nodes      []Repository `json:"nodes"`
 	} `json:"repositories"`

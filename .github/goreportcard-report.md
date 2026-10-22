@@ -22,14 +22,14 @@
 
 ### gocyclo
 
-- `internal/fetchers/github.go`
-  - Line 400: cyclomatic complexity 24 for function (*GitHubClient).RequestUserInfoContext
-- `cmd/server/main.go`
-  - Line 61: cyclomatic complexity 23 for function runCLI
 - `internal/common/retryer.go`
   - Line 53: cyclomatic complexity 22 for function RetryerContext
 - `internal/api/cli.go`
   - Line 32: cyclomatic complexity 19 for function GenerateTrophyCard
+- `internal/fetchers/github.go`
+  - Line 400: cyclomatic complexity 24 for function (*GitHubClient).RequestUserInfoContext
+- `cmd/server/main.go`
+  - Line 61: cyclomatic complexity 23 for function runCLI
 
 ### misspell
 
